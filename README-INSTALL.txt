@@ -31,3 +31,9 @@ DATA & BACKUP
 
 FEATURES
 Student register, attendance, tests, marks, result reports, CSV export, timetable, local auto-save, backup/restore, print reports, installable PWA when hosted over HTTPS.
+
+UPDATED FEATURES
+- CSV import for multiple students (use Download CSV template for exact column names).
+- Guardian mobile number field.
+- Tap-to-call link and WhatsApp chat link from student register.
+- WhatsApp opens the chat; teacher must review/send the message manually.
