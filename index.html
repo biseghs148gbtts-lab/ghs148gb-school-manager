@@ -41,7 +41,7 @@ main{padding:12px 13px 40px}.nav{display:flex;gap:7px;overflow:auto;padding:4px 
 <nav class="nav no-print" id="nav">
 <button class="active" data-page="home">Overview</button><button data-page="students">Students</button><button data-page="attendance">Attendance</button><button data-page="exams">Tests & Marks</button><button data-page="results">Results</button><button data-page="timetable">Timetable</button><button data-page="backup">Backup & Settings</button>
 </nav>
-<section class="page active" id="home">\n<div class="panel"><h2>Cloud Database</h2><p class="muted">Supabase shared school records</p><div class="actions"><button type="button" id="cloudSyncBtn">Sync shared data</button></div><p id="cloudSyncMessage" class="muted" aria-live="polite">Login کے بعد Cloud Sync چلائیں۔</p></div>\n
+<section class="page active" id="home">\n<div class="panel"><h2>Cloud Database</h2><p class="muted">Supabase shared school records</p><div class="actions"><button type="button" id="cloudSyncBtn">Load shared data</button></div><p id="cloudSyncMessage" class="muted" aria-live="polite">Login کے بعد Cloud Sync چلائیں۔</p></div>\n
 <div class="stats"><div class="stat"><span>Total students</span><b id="dashStudents">0</b></div><div class="stat"><span>Attendance records</span><b id="dashAttendance">0</b></div><div class="stat"><span>Tests created</span><b id="dashTests">0</b></div><div class="stat"><span>Marks entries</span><b id="dashMarks">0</b></div></div>
 <div class="panel"><h2>Welcome to your School Manager</h2><p>Manage student lists, daily attendance, tests, marks, result reports and class timetable in one place.</p><div class="actions no-print"><button onclick="go('students')">＋ Add students</button><button class="secondary" onclick="go('attendance')">✓ Take attendance</button><button class="secondary" onclick="go('exams')">＋ Create test</button><button class="secondary" onclick="go('backup')">⇩ Backup data</button></div></div>
 <div class="panel"><h2>Important information</h2><div class="notice">Data is saved automatically on this device/browser. For safety, export a backup regularly and keep a copy in Google Drive or another safe place. Browser security does not allow an app to silently write backup files to your Downloads folder repeatedly.</div><p class="muted">For shared records across multiple phones/teachers, a secure online database and sign-in system must be added separately.</p></div>
@@ -155,9 +155,56 @@ async function approveStaffTeacher(id){
  if(error){staffAuthMsg('Approval ناکام: '+error.message);return}
  staffAuthMsg('استاد کا اکاؤنٹ Approve ہوگیا۔',true);await loadStaffApprovalRequests();
 }
+
+async function loadSharedSchoolData(){
+ const msg=$('cloudSyncMessage'),btn=$('cloudSyncBtn');
+ if(!schoolAuthClient||!schoolAuthProfile||!['admin','teacher'].includes(schoolAuthProfile.role)){msg.textContent='پہلے منظور شدہ اکاؤنٹ سے Login کریں۔';return}
+ btn.disabled=true;msg.textContent='Cloud Database سے ریکارڈ حاصل ہو رہا ہے…';
+ try{
+  const [cr,sr,ar,er,mr]=await Promise.all([
+   schoolAuthClient.from('classes').select('id,class_name,section,academic_session'),
+   schoolAuthClient.from('students').select('id,student_name,father_name,class_id,roll_no,admission_no,subject_group,mobile,is_active'),
+   schoolAuthClient.from('attendance').select('id,student_id,attendance_date,status'),
+   schoolAuthClient.from('exams').select('id,exam_name,class_id,subject,exam_date,total_marks'),
+   schoolAuthClient.from('marks').select('id,exam_id,student_id,obtained_marks')
+  ]);
+  for(const r of [cr,sr,ar,er,mr])if(r.error)throw r.error;
+  const classes=cr.data||[],students=sr.data||[],att=ar.data||[],exams=er.data||[],marks=mr.data||[];
+  const classById=new Map(classes.map(x=>[x.id,x]));
+  const oldStudentIdMap=new Map(),oldTestIdMap=new Map();
+  const nextStudents=students.map(s=>{
+   const cl=classById.get(s.class_id)||{};
+   const match=db.students.find(x=>(s.admission_no&&x.adm&&s.admission_no===x.adm)||(!s.admission_no||!x.adm)&&String(x.roll||'')===String(s.roll_no||'')&&String(x.name||'').trim().toLowerCase()===String(s.student_name||'').trim().toLowerCase()&&String(x.cls||'')===String(cl.class_name||''));
+   if(match)oldStudentIdMap.set(match.id,s.id);
+   return {id:s.id,name:s.student_name,father:s.father_name||'',cls:cl.class_name||'',section:cl.section||'',roll:s.roll_no||'',subject:s.subject_group||'',adm:s.admission_no||'',phone:s.mobile||'',cloudId:s.id};
+  });
+  const nextTests=exams.map(e=>{
+   const cl=classById.get(e.class_id)||{};
+   const match=db.tests.find(x=>x.name===e.exam_name&&x.cls===cl.class_name&&x.subject===e.subject&&x.date===e.exam_date);
+   if(match)oldTestIdMap.set(match.id,e.id);
+   return {id:e.id,name:e.exam_name,cls:cl.class_name||'',section:cl.section||'',subject:e.subject||'',total:Number(e.total_marks)||0,date:e.exam_date||'',cloudId:e.id};
+  });
+  const localStudents=db.students.filter(x=>!oldStudentIdMap.has(x.id)&&!students.some(s=>s.id===x.id));
+  const localTests=db.tests.filter(x=>!oldTestIdMap.has(x.id)&&!exams.some(e=>e.id===x.id));
+  const mergedStudents=[...nextStudents,...localStudents];
+  const mergedTests=[...nextTests,...localTests];
+  const nextAttendance=att.map(a=>({sid:a.student_id,date:a.attendance_date,status:a.status,cloudId:a.id}));
+  const nextMarks=marks.map(m=>({sid:m.student_id,tid:m.exam_id,obt:Number(m.obtained_marks),cloudId:m.id}));
+  db.students=mergedStudents;
+  db.tests=mergedTests;
+  db.attendance=[...nextAttendance,...db.attendance.filter(a=>!nextAttendance.some(x=>x.sid===a.sid&&x.date===a.date))];
+  db.marks=[...nextMarks,...db.marks.filter(m=>!nextMarks.some(x=>x.sid===m.sid&&x.tid===m.tid))];
+  for(const a of db.attendance)if(oldStudentIdMap.has(a.sid))a.sid=oldStudentIdMap.get(a.sid);
+  for(const m of db.marks){if(oldStudentIdMap.has(m.sid))m.sid=oldStudentIdMap.get(m.sid);if(oldTestIdMap.has(m.tid))m.tid=oldTestIdMap.get(m.tid)}
+  persist();msg.textContent='Cloud سے '+students.length+' طلبہ، '+att.length+' حاضری، '+exams.length+' امتحانات اور '+marks.length+' نتائج لوڈ ہوگئے۔ یہ مرحلہ صرف Cloud سے ڈیٹا پڑھتا ہے۔';
+ }catch(e){msg.textContent='Cloud Sync ناکام: '+(e.message||String(e))}
+ finally{btn.disabled=false}
+}
+
 function initSchoolAuth(){
  if(!window.supabase?.createClient){setSchoolAppVisible(false);staffAuthMsg('Supabase library load نہیں ہوئی۔ Internet چیک کریں۔');return}
  schoolAuthClient=window.supabase.createClient(SCHOOL_SUPABASE_URL,SCHOOL_SUPABASE_PUBLISHABLE_KEY);
+ $('cloudSyncBtn').onclick=loadSharedSchoolData;
  $('staffSignup').onclick=async()=>{
   const full_name=$('staffFullName').value.trim(),email=$('staffEmail').value.trim(),password=$('staffPassword').value;
   if(!full_name||!email||password.length<8){staffAuthMsg('پورا نام، درست Email اور کم از کم 8 حروف کا Password درج کریں۔');return}
