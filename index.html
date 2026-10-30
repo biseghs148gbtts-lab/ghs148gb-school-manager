@@ -20,7 +20,24 @@ main{padding:12px 13px 40px}.nav{display:flex;gap:7px;overflow:auto;padding:4px 
 <div class="brand"><div class="logo">🏫</div><div><h1>GOVT. HIGH SCHOOL 148GB</h1><p>Toba Tek Singh · School Manager</p></div></div>
 <div class="status"><span class="chip" id="onlineStatus">Checking connection…</span><span class="chip" id="saveStatus">Local auto-save enabled</span><span class="chip" id="installStatus">Installable app</span></div>
 </div></header>
-<main>
+<style>
+#staffAuthGate{max-width:520px;margin:18px auto;padding:16px;background:#fff;border:1px solid #dce8e1;border-radius:15px}
+#staffAuthGate input{width:100%;padding:11px;border:1px solid #cbdad2;border-radius:9px;margin:5px 0 12px}
+#staffAuthGate .authmsg{padding:10px;border-radius:9px;background:#fff7df;color:#6c551a;font-size:13px}
+#staffAuthGate .authrow{display:flex;gap:8px;flex-wrap:wrap}
+#staffAuthGate .authrow button{flex:1}
+#staffAdminPanel{margin-top:15px;padding-top:12px;border-top:1px solid #dce8e1}
+</style>
+<section id="staffAuthGate">
+<h2>GHS 148GB — Staff Login</h2>
+<p class="muted">اساتذہ اپنے نام، Email اور Password سے اکاؤنٹ بنائیں۔ اکاؤنٹ کی منظوری صرف Main Admin دے گا۔</p>
+<label>Full Name</label><input id="staffFullName" autocomplete="name" placeholder="اپنا پورا نام">
+<label>Email Address</label><input id="staffEmail" type="email" autocomplete="email" placeholder="name@example.com">
+<label>Password (کم از کم 8 حروف)</label><input id="staffPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Password">
+<div class="authrow"><button id="staffSignup" type="button">Sign Up</button><button id="staffLogin" type="button" class="secondary">Sign In</button><button id="staffLogout" type="button" class="secondary" hidden>Sign Out</button></div>
+<p id="staffAuthMessage" class="authmsg" aria-live="polite">Login کریں یا نیا Teacher اکاؤنٹ بنائیں۔</p>
+<div id="staffAdminPanel" hidden><h3>Teacher Approval Requests</h3><div id="staffPendingList"></div></div>
+</section>\n<main id="schoolAppMain">
 <nav class="nav no-print" id="nav">
 <button class="active" data-page="home">Overview</button><button data-page="students">Students</button><button data-page="attendance">Attendance</button><button data-page="exams">Tests & Marks</button><button data-page="results">Results</button><button data-page="timetable">Timetable</button><button data-page="backup">Backup & Settings</button>
 </nav>
@@ -55,7 +72,7 @@ main{padding:12px 13px 40px}.nav{display:flex;gap:7px;overflow:auto;padding:4px 
 <div class="panel"><h2>Data management</h2><button class="danger" onclick="clearAll()">Delete all app data</button><p class="tiny">This permanently clears data stored in this browser. Download a backup first.</p></div>
 </section>
 </main><footer>GHS 148GB School Manager · Prototype · Keep student information private</footer>
-<script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>\n<script>
 const KEY='ghs148gb_professional_v1';
 let db;try{db=JSON.parse(localStorage.getItem(KEY))}catch(e){};if(!db)db={students:[],attendance:[],tests:[],marks:[],timetable:{}};
 const $=id=>document.getElementById(id);const today=()=>new Date().toLocaleDateString('en-CA');
@@ -102,5 +119,62 @@ let installPrompt;window.addEventListener('beforeinstallprompt',e=>{e.preventDef
 async function installApp(){if(installPrompt){installPrompt.prompt();await installPrompt.userChoice;installPrompt=null}else alert('Open Chrome menu (⋮) and choose Install app or Add to Home screen.')}
 if('serviceWorker' in navigator && location.protocol.startsWith('http'))window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 buildPeriods();renderAll();
-</script>
+
+// Supabase Email authentication and admin approval gate.
+// Browser code uses the publishable key only; never add a service-role key here.
+const SCHOOL_SUPABASE_URL='https://fswjqdlmlyvigcnaelvc.supabase.co';
+const SCHOOL_SUPABASE_PUBLISHABLE_KEY='sb_publishable_zrQX_6MjKYVKQKT3xUunWQ_gtuH-ybp';
+let schoolAuthClient=null,schoolAuthProfile=null;
+function staffAuthMsg(message,success=false){const el=$('staffAuthMessage');el.textContent=message;el.style.background=success?'#eaf7ef':'#fff7df';el.style.color=success?'#175b3e':'#6c551a'}
+function setSchoolAppVisible(visible){$('schoolAppMain').classList.toggle('hidden',!visible);$('staffAuthGate').classList.toggle('hidden',visible)}
+async function refreshStaffSession(){
+ if(!schoolAuthClient)return;
+ const {data:{user}}=await schoolAuthClient.auth.getUser();
+ if(!user){schoolAuthProfile=null;setSchoolAppVisible(false);$('staffLogout').hidden=true;return}
+ const {data:profile,error}=await schoolAuthClient.from('profiles').select('id,full_name,role,is_active,approval_status').eq('id',user.id).maybeSingle();
+ if(error){setSchoolAppVisible(false);staffAuthMsg('Profile حاصل نہیں ہو سکا: '+error.message);return}
+ schoolAuthProfile=profile;$('staffLogout').hidden=false;
+ const allowed=!!profile&&profile.is_active===true&&profile.approval_status==='approved'&&['admin','teacher'].includes(profile.role);
+ setSchoolAppVisible(allowed);
+ if(!allowed){staffAuthMsg('آپ کی درخواست موصول ہوگئی ہے۔ Main Admin کی منظوری تک انتظار کریں۔',true);return}
+ staffAuthMsg('Login کامیاب: '+(profile.full_name||user.email)+' ('+profile.role+')',true);
+ $('staffAdminPanel').hidden=profile.role!=='admin';
+ if(profile.role==='admin')await loadStaffApprovalRequests();
+}
+async function loadStaffApprovalRequests(){
+ const box=$('staffPendingList');
+ const {data,error}=await schoolAuthClient.from('profiles').select('id,full_name,created_at').eq('role','teacher').eq('approval_status','pending').order('created_at');
+ if(error){box.textContent='درخواستیں لوڈ نہیں ہو سکیں: '+error.message;return}
+ box.innerHTML='';
+ if(!data?.length){box.textContent='کوئی Pending درخواست نہیں۔';return}
+ for(const p of data){const row=document.createElement('div');row.className='checkrow';const name=document.createElement('span');name.textContent=p.full_name||'Teacher';name.style.flex='1';const btn=document.createElement('button');btn.type='button';btn.textContent='Approve';btn.onclick=()=>approveStaffTeacher(p.id);row.append(name,btn);box.append(row)}
+}
+async function approveStaffTeacher(id){
+ if(schoolAuthProfile?.role!=='admin'){staffAuthMsg('صرف Main Admin منظوری دے سکتا ہے۔');return}
+ const {error}=await schoolAuthClient.from('profiles').update({approval_status:'approved',is_active:true}).eq('id',id);
+ if(error){staffAuthMsg('Approval ناکام: '+error.message);return}
+ staffAuthMsg('استاد کا اکاؤنٹ Approve ہوگیا۔',true);await loadStaffApprovalRequests();
+}
+function initSchoolAuth(){
+ if(!window.supabase?.createClient){setSchoolAppVisible(false);staffAuthMsg('Supabase library load نہیں ہوئی۔ Internet چیک کریں۔');return}
+ schoolAuthClient=window.supabase.createClient(SCHOOL_SUPABASE_URL,SCHOOL_SUPABASE_PUBLISHABLE_KEY);
+ $('staffSignup').onclick=async()=>{
+  const full_name=$('staffFullName').value.trim(),email=$('staffEmail').value.trim(),password=$('staffPassword').value;
+  if(!full_name||!email||password.length<8){staffAuthMsg('پورا نام، درست Email اور کم از کم 8 حروف کا Password درج کریں۔');return}
+  const {data,error}=await schoolAuthClient.auth.signUp({email,password,options:{data:{full_name}}});
+  if(error){staffAuthMsg(error.message);return}
+  staffAuthMsg(data.session?'اکاؤنٹ بن گیا؛ Main Admin کی منظوری کا انتظار کریں۔':'Confirmation Email بھیجی گئی ہے۔ Email confirm کرکے Sign In کریں۔',true);
+ };
+ $('staffLogin').onclick=async()=>{
+  const email=$('staffEmail').value.trim(),password=$('staffPassword').value;
+  if(!email||!password){staffAuthMsg('Email اور Password درج کریں۔');return}
+  const {error}=await schoolAuthClient.auth.signInWithPassword({email,password});
+  if(error){staffAuthMsg(error.message);return}await refreshStaffSession();
+ };
+ $('staffLogout').onclick=async()=>{await schoolAuthClient.auth.signOut();schoolAuthProfile=null;setSchoolAppVisible(false);staffAuthMsg('آپ Sign Out ہوگئے ہیں۔')};
+ schoolAuthClient.auth.onAuthStateChange(()=>setTimeout(refreshStaffSession,0));
+ refreshStaffSession();
+}
+window.addEventListener('load',initSchoolAuth);
+\n</script>
 </body></html>
