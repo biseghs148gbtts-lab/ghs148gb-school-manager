@@ -196,6 +196,8 @@ async function loadSharedSchoolData(){
   db.marks=[...nextMarks,...db.marks.filter(m=>!nextMarks.some(x=>x.sid===m.sid&&x.tid===m.tid))];
   for(const a of db.attendance)if(oldStudentIdMap.has(a.sid))a.sid=oldStudentIdMap.get(a.sid);
   for(const m of db.marks){if(oldStudentIdMap.has(m.sid))m.sid=oldStudentIdMap.get(m.sid);if(oldTestIdMap.has(m.tid))m.tid=oldTestIdMap.get(m.tid)}
+  db.attendance=db.attendance.filter((a,i,arr)=>arr.findIndex(x=>x.sid===a.sid&&x.date===a.date)===i);
+  db.marks=db.marks.filter((m,i,arr)=>arr.findIndex(x=>x.sid===m.sid&&x.tid===m.tid)===i);
   persist();msg.textContent='Cloud سے '+students.length+' طلبہ، '+att.length+' حاضری، '+exams.length+' امتحانات اور '+marks.length+' نتائج لوڈ ہوگئے۔ یہ مرحلہ صرف Cloud سے ڈیٹا پڑھتا ہے۔';
  }catch(e){msg.textContent='Cloud Sync ناکام: '+(e.message||String(e))}
  finally{btn.disabled=false}
