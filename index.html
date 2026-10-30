@@ -41,7 +41,7 @@ main{padding:12px 13px 40px}.nav{display:flex;gap:7px;overflow:auto;padding:4px 
 <nav class="nav no-print" id="nav">
 <button class="active" data-page="home">Overview</button><button data-page="students">Students</button><button data-page="attendance">Attendance</button><button data-page="exams">Tests & Marks</button><button data-page="results">Results</button><button data-page="timetable">Timetable</button><button data-page="backup">Backup & Settings</button>
 </nav>
-<section class="page active" id="home">\n<div class="panel"><h2>Cloud Database</h2><p class="muted">Supabase shared school records</p><div class="actions"><button type="button" id="cloudSyncBtn">Load shared data</button></div><p id="cloudSyncMessage" class="muted" aria-live="polite">Login کے بعد Cloud Sync چلائیں۔</p></div>\n
+<section class="page active" id="home">\n<div class="panel"><h2>Cloud Database</h2><p class="muted">Supabase shared school records</p><div class="actions"><button type="button" id="cloudSyncBtn">Load shared data</button><button type="button" class="secondary" id="cloudUploadBtn">Upload this device data</button></div><p id="cloudSyncMessage" class="muted" aria-live="polite">Login کے بعد Cloud Sync چلائیں۔</p></div>\n
 <div class="stats"><div class="stat"><span>Total students</span><b id="dashStudents">0</b></div><div class="stat"><span>Attendance records</span><b id="dashAttendance">0</b></div><div class="stat"><span>Tests created</span><b id="dashTests">0</b></div><div class="stat"><span>Marks entries</span><b id="dashMarks">0</b></div></div>
 <div class="panel"><h2>Welcome to your School Manager</h2><p>Manage student lists, daily attendance, tests, marks, result reports and class timetable in one place.</p><div class="actions no-print"><button onclick="go('students')">＋ Add students</button><button class="secondary" onclick="go('attendance')">✓ Take attendance</button><button class="secondary" onclick="go('exams')">＋ Create test</button><button class="secondary" onclick="go('backup')">⇩ Backup data</button></div></div>
 <div class="panel"><h2>Important information</h2><div class="notice">Data is saved automatically on this device/browser. For safety, export a backup regularly and keep a copy in Google Drive or another safe place. Browser security does not allow an app to silently write backup files to your Downloads folder repeatedly.</div><p class="muted">For shared records across multiple phones/teachers, a secure online database and sign-in system must be added separately.</p></div>
@@ -156,6 +156,62 @@ async function approveStaffTeacher(id){
  staffAuthMsg('استاد کا اکاؤنٹ Approve ہوگیا۔',true);await loadStaffApprovalRequests();
 }
 
+
+async function uploadLocalSchoolData(){
+ const msg=$('cloudSyncMessage'),btn=$('cloudUploadBtn');
+ if(!schoolAuthClient||!schoolAuthProfile||!['admin','teacher'].includes(schoolAuthProfile.role)){msg.textContent='پہلے منظور شدہ اکاؤنٹ سے Login کریں۔';return}
+ if(!confirm('اس ڈیوائس کا مقامی ریکارڈ مشترکہ Cloud Database میں شامل کیا جائے؟ پہلے سے موجود ریکارڈ کی نقل بنانے سے بچنے کے لیے مماثل ریکارڈ تلاش کیے جائیں گے۔'))return;
+ btn.disabled=true;msg.textContent='Local data Cloud میں محفوظ ہو رہا ہے…';
+ try{
+  const classIds=new Map(),studentIds=new Map(),examIds=new Map();
+  for(const s of db.students){
+   const key=String(s.cls||'')+'|'+String(s.section||'');
+   if(!classIds.has(key)){
+    let q=await schoolAuthClient.from('classes').select('id').eq('class_name',s.cls||'').eq('section',s.section||'').limit(1);
+    if(q.error)throw q.error;
+    let row=q.data?.[0];
+    if(!row){q=await schoolAuthClient.from('classes').insert({class_name:s.cls||'Unassigned',section:s.section||'',academic_session:'2026-2028'}).select('id').single();if(q.error)throw q.error;row=q.data}
+    classIds.set(key,row.id);
+   }
+   const cid=classIds.get(key);
+   let q=schoolAuthClient.from('students').select('id').eq('class_id',cid);
+   if(s.adm)q=q.eq('admission_no',s.adm);else q=q.eq('roll_no',String(s.roll||''));
+   let found=await q.limit(1);if(found.error)throw found.error;
+   let row=found.data?.[0];
+   const payload={student_name:s.name||'',father_name:s.father||'',class_id:cid,roll_no:String(s.roll||''),admission_no:s.adm||'',subject_group:s.subject||'',mobile:s.phone||'',is_active:true};
+   if(row){let z=await schoolAuthClient.from('students').update(payload).eq('id',row.id).select('id').single();if(z.error)throw z.error;row=z.data}
+   else{let z=await schoolAuthClient.from('students').insert(payload).select('id').single();if(z.error)throw z.error;row=z.data}
+   studentIds.set(s.id,row.id);
+  }
+  for(const t of db.tests){
+   const cid=classIds.get(String(t.cls||'')+'|'+String(t.section||''));if(!cid)continue;
+   let q=await schoolAuthClient.from('exams').select('id').eq('class_id',cid).eq('exam_name',t.name||'').eq('subject',t.subject||'').eq('exam_date',t.date||'').limit(1);
+   if(q.error)throw q.error;let row=q.data?.[0];
+   const payload={exam_name:t.name||'',class_id:cid,subject:t.subject||'',exam_date:t.date||null,total_marks:Number(t.total)||0};
+   if(row){let z=await schoolAuthClient.from('exams').update(payload).eq('id',row.id).select('id').single();if(z.error)throw z.error;row=z.data}
+   else{let z=await schoolAuthClient.from('exams').insert(payload).select('id').single();if(z.error)throw z.error;row=z.data}
+   examIds.set(t.id,row.id);
+  }
+  for(const a of db.attendance){
+   const sid=studentIds.get(a.sid);if(!sid)continue;
+   let q=await schoolAuthClient.from('attendance').select('id').eq('student_id',sid).eq('attendance_date',a.date).limit(1);
+   if(q.error)throw q.error;const payload={student_id:sid,attendance_date:a.date,status:a.status,marked_by:(await schoolAuthClient.auth.getUser()).data.user.id};
+   if(q.data?.[0]){let z=await schoolAuthClient.from('attendance').update(payload).eq('id',q.data[0].id);if(z.error)throw z.error}
+   else{let z=await schoolAuthClient.from('attendance').insert(payload);if(z.error)throw z.error}
+  }
+  for(const m of db.marks){
+   const sid=studentIds.get(m.sid),eid=examIds.get(m.tid);if(!sid||!eid)continue;
+   let q=await schoolAuthClient.from('marks').select('id').eq('student_id',sid).eq('exam_id',eid).limit(1);
+   if(q.error)throw q.error;const payload={student_id:sid,exam_id:eid,obtained_marks:Number(m.obt)||0};
+   if(q.data?.[0]){let z=await schoolAuthClient.from('marks').update(payload).eq('id',q.data[0].id);if(z.error)throw z.error}
+   else{let z=await schoolAuthClient.from('marks').insert(payload);if(z.error)throw z.error}
+  }
+  msg.textContent='Upload مکمل: '+db.students.length+' طلبہ، '+db.attendance.length+' حاضری ریکارڈ، '+db.tests.length+' ٹیسٹ اور '+db.marks.length+' نمبرز کی کارروائی ہوئی۔';
+  await loadSharedSchoolData();
+ }catch(e){msg.textContent='Upload میں مسئلہ: '+(e.message||String(e))+'۔ جو ریکارڈ پہلے محفوظ ہو چکا ہے وہ Cloud میں موجود رہے گا۔'}
+ finally{btn.disabled=false}
+}
+
 async function loadSharedSchoolData(){
  const msg=$('cloudSyncMessage'),btn=$('cloudSyncBtn');
  if(!schoolAuthClient||!schoolAuthProfile||!['admin','teacher'].includes(schoolAuthProfile.role)){msg.textContent='پہلے منظور شدہ اکاؤنٹ سے Login کریں۔';return}
@@ -207,6 +263,7 @@ function initSchoolAuth(){
  if(!window.supabase?.createClient){setSchoolAppVisible(false);staffAuthMsg('Supabase library load نہیں ہوئی۔ Internet چیک کریں۔');return}
  schoolAuthClient=window.supabase.createClient(SCHOOL_SUPABASE_URL,SCHOOL_SUPABASE_PUBLISHABLE_KEY);
  $('cloudSyncBtn').onclick=loadSharedSchoolData;
+ $('cloudUploadBtn').onclick=uploadLocalSchoolData;
  $('staffSignup').onclick=async()=>{
   const full_name=$('staffFullName').value.trim(),email=$('staffEmail').value.trim(),password=$('staffPassword').value;
   if(!full_name||!email||password.length<8){staffAuthMsg('پورا نام، درست Email اور کم از کم 8 حروف کا Password درج کریں۔');return}
