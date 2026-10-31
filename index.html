@@ -103,7 +103,46 @@ function showResults(){let t=db.tests.find(x=>x.id===+$('resultTest').value);if(
 function loadAttendance(){let cl=$('aClass').value,sec=$('aSection').value,date=$('aDate').value;let list=db.students.filter(s=>s.cls===cl&&s.section===sec);$('attendanceList').innerHTML=list.map(s=>{let a=db.attendance.find(x=>x.sid===s.id&&x.date===date);return `<div class="checkrow"><div style="flex:1"><b>${safe(s.roll)} · ${safe(s.name)}</b><div class="tiny">${safe(s.father)}</div></div><select data-sid="${s.id}" class="attstatus"><option value="P" ${a?.status==='P'?'selected':''}>Present</option><option value="A" ${a?.status==='A'?'selected':''}>Absent</option><option value="L" ${a?.status==='L'?'selected':''}>Leave</option></select></div>`}).join('')||'<p class="empty">No students for this class/section. Add students first.</p>'}
 $('aClass').onchange=loadAttendance;$('aSection').onchange=loadAttendance;$('aDate').onchange=loadAttendance;
 function markAll(v){document.querySelectorAll('.attstatus').forEach(s=>s.value=v)}
-function saveAttendance(){let date=$('aDate').value;if(!date){alert('Select date');return}document.querySelectorAll('.attstatus').forEach(el=>{let sid=+el.dataset.sid,old=db.attendance.find(a=>a.sid===sid&&a.date===date);if(old)old.status=el.value;else db.attendance.push({sid,date,status:el.value})});$('attendanceMessage').textContent='Attendance saved for '+date;persist()}
+async function saveAttendance(){
+ let date=$('aDate').value;
+ if(!date){alert('Select date');return}
+ const rows=[...document.querySelectorAll('.attstatus')];
+ if(!rows.length){$('attendanceMessage').textContent='اس کلاس/سیکشن کی فہرست خالی ہے۔ پہلے Load class list کریں۔';return}
+ rows.forEach(el=>{let sid=+el.dataset.sid,old=db.attendance.find(a=>a.sid===sid&&a.date===date);if(old)old.status=el.value;else db.attendance.push({sid,date,status:el.value})});
+ persist();
+ if(!schoolAuthClient||!schoolAuthProfile||!['admin','teacher'].includes(schoolAuthProfile.role)){
+  $('attendanceMessage').textContent='حاضری اس ڈیوائس میں محفوظ ہوگئی؛ Cloud میں بھیجنے کے لیے منظور شدہ اکاؤنٹ سے Login کریں۔';return;
+ }
+ const cloudRows=rows.map(el=>({el,student:db.students.find(s=>Number(s.id)===Number(el.dataset.sid))})).filter(x=>x.student?.cloudId);
+ if(cloudRows.length!==rows.length){
+  $('attendanceMessage').textContent='حاضری ڈیوائس میں محفوظ ہے، لیکن کچھ طلبہ کے Cloud IDs نہیں ملے۔ پہلے Cloud Database سے Load shared data کریں، پھر دوبارہ Save کریں۔';return;
+ }
+ const btn=document.querySelector('button[onclick="saveAttendance()"]');
+ if(btn)btn.disabled=true;
+ $('attendanceMessage').textContent='حاضری Cloud Database میں محفوظ ہو رہی ہے…';
+ try{
+  const userResult=await schoolAuthClient.auth.getUser();
+  if(userResult.error)throw userResult.error;
+  const userId=userResult.data?.user?.id;
+  if(!userId)throw new Error('Login session نہیں ملی؛ دوبارہ Sign In کریں۔');
+  for(const item of cloudRows){
+   const studentId=item.student.cloudId;
+   const payload={student_id:studentId,attendance_date:date,status:item.el.value,marked_by:userId};
+   const existing=await schoolAuthClient.from('attendance').select('id').eq('student_id',studentId).eq('attendance_date',date).limit(1);
+   if(existing.error)throw existing.error;
+   if(existing.data?.length){
+    const updated=await schoolAuthClient.from('attendance').update(payload).eq('id',existing.data[0].id);
+    if(updated.error)throw updated.error;
+   }else{
+    const inserted=await schoolAuthClient.from('attendance').insert(payload);
+    if(inserted.error)throw inserted.error;
+   }
+  }
+  $('attendanceMessage').textContent='کامیابی! '+cloudRows.length+' طلبہ کی حاضری '+date+' کے لیے Cloud Database میں بھی محفوظ ہوگئی۔';
+ }catch(e){
+  $('attendanceMessage').textContent='حاضری ڈیوائس میں محفوظ ہے، مگر Cloud Sync ناکام ہوا: '+(e.message||String(e));
+ }finally{if(btn)btn.disabled=false}
+}
 function attendanceSummary(){let cl=$('asClass').value,sec=$('asSection').value,from=$('asFrom').value,to=$('asTo').value;let students=db.students.filter(s=>s.cls===cl&&(!sec||s.section===sec));$('attendanceSummaryRows').innerHTML=students.map(s=>{let a=db.attendance.filter(x=>x.sid===s.id&&(!from||x.date>=from)&&(!to||x.date<=to));let p=a.filter(x=>x.status==='P').length,ab=a.filter(x=>x.status==='A').length,l=a.filter(x=>x.status==='L').length,den=p+ab+l;return `<tr><td>${safe(s.roll)}</td><td>${safe(s.name)}</td><td>${p}</td><td>${ab}</td><td>${l}</td><td>${den?(100*p/den).toFixed(1)+'%':'—'}</td></tr>`}).join('')||'<tr><td colspan="6">No students.</td></tr>'}
 function buildPeriods(){let cls=$('ttClass').value,day=$('ttDay').value,old=db.timetable[cls+'_'+day]||[];$('periodInputs').innerHTML=Array.from({length:8},(_,i)=>`<div class="field"><label>Period ${i+1}</label><input id="period${i}" value="${safe(old[i]||'')}" placeholder="Subject / teacher"></div>`).join('')}
 $('ttClass').onchange=buildPeriods;$('ttDay').onchange=buildPeriods;
