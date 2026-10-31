@@ -167,8 +167,8 @@ function exportClassResultSummaryCSV(){
  const ordered=[...rows].sort((a,b)=>{if(a.position===null)return b.position===null?Number(a.s.roll||0)-Number(b.s.roll||0):1;if(b.position===null)return -1;return a.position-b.position||Number(a.s.roll||0)-Number(b.s.roll||0)});
  const pos=n=>n===null?'':n===1?'1st':n===2?'2nd':n===3?'3rd':n+'th';
  ordered.forEach(r=>csvRows.push([pos(r.position),r.s.roll||'',r.s.name||'',r.s.father||'',r.s.cls||'',r.s.section||'',r.obtained===null?'':r.obtained,t.total,r.percentage===null?'':r.percentage.toFixed(1)+'%',resultGrade(r.percentage),r.status]));
- const csv=csvRows.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\\r\\n');
- const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='GHS148GB-'+t.cls+'-'+(t.section||'All')+'-Result-Summary.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+ const csv=csvRows.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='GHS148GB-'+t.cls+'-'+(t.section||'All')+'-Result-Summary.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500);
 }
 
 function fillCardStudents(){const t=db.tests.find(x=>x.id===+$('resultTest').value),el=$('cardStudent');if(!el)return;const keep=el.value;el.innerHTML='<option value="">Select student</option>'+db.students.filter(s=>t&&s.cls===t.cls&&(!t.section||s.section===t.section)).map(s=>'<option value="'+s.id+'">'+safe(s.roll)+' · '+safe(s.name)+'</option>').join('');if(keep&&[...el.options].some(o=>o.value===keep))el.value=keep}
