@@ -408,8 +408,9 @@ async function uploadLocalSchoolData(){
    else{let z=await schoolAuthClient.from('marks').insert(payload);if(z.error)throw z.error}
   }
   if(schoolAuthProfile.role==='admin'){for(const f of db.fees){const sid=studentIds.get(Number(f.sid))||f.sid;if(!sid)continue;let q=schoolAuthClient.from('fees').select('id').eq('student_id',sid);q=f.due?q.eq('due_date',f.due):q.is('due_date',null);q=await q.limit(1);if(q.error)throw q.error;const payload={student_id:sid,amount:Number(f.amount)||0,paid_amount:Number(f.paid)||0,due_date:f.due||null,payment_date:f.paymentDate||null};if(q.data?.[0]){let z=await schoolAuthClient.from('fees').update(payload).eq('id',q.data[0].id);if(z.error)throw z.error}else{let z=await schoolAuthClient.from('fees').insert(payload);if(z.error)throw z.error}}}
-  msg.textContent='Upload مکمل: '+db.students.length+' طلبہ، '+db.attendance.length+' حاضری، '+db.tests.length+' ٹیسٹ، '+db.marks.length+' نمبرز اور '+(schoolAuthProfile.role==='admin'?db.fees.length+' فیس ریکارڈ':'فیس ڈیٹا صرف Admin کے لیے')+' کی کارروائی ہوئی۔';
+  const uploadSummary='Upload مکمل: '+db.students.length+' طلبہ، '+db.attendance.length+' حاضری، '+db.tests.length+' ٹیسٹ، '+db.marks.length+' نمبرز اور '+(schoolAuthProfile.role==='admin'?db.fees.length+' فیس ریکارڈ':'فیس ڈیٹا صرف Admin کے لیے')+' کی کارروائی ہوئی۔';
   await loadSharedSchoolData();
+  msg.textContent=uploadSummary+' Cloud سے تازہ ریکارڈ بھی لوڈ ہوگئے۔';
  }catch(e){msg.textContent='Upload میں مسئلہ: '+(e.message||String(e))+'۔ جو ریکارڈ پہلے محفوظ ہو چکا ہے وہ Cloud میں موجود رہے گا۔'}
  finally{btn.disabled=false}
 }
