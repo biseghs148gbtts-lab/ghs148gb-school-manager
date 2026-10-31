@@ -131,7 +131,7 @@ function showResults(){
  const {test:t,tests,rows,ranked}=getClassResultData();
  if(!t){$('resultRows').innerHTML='';$('resultSummary').textContent='Create a test first.';return}
  const pos=n=>n===null?'—':n===1?'1st':n===2?'2nd':n===3?'3rd':n+'th';
- $('resultRows').innerHTML=rows.map(r=>`<tr><td>${safe(r.s.roll)}</td><td>${safe(r.s.name)}</td><td>${safe(r.s.cls)}/${safe(r.s.section)}</td><td>${r.obtained===null?'—':r.obtained}</td><td>${r.total}</td><td>${r.percentage===null?'—':r.percentage.toFixed(1)+'%'}</td><td>${resultGrade(r.percentage)}</td><td>${pos(r.position)}</td><td>${r.status}</td></tr>`).join('')||'<tr><td colspan="9" class="empty">No students in this class.</td></tr>';
+ $('resultRows').innerHTML=rows.map(r=>`<tr><td>${safe(r.s.roll)}</td><td>${safe(r.s.name)}</td><td>${safe(r.s.cls)}/${safe(r.s.section)}</td><td>${r.obtained===null?'—':r.obtained}</td><td>${r.total}</td><td>${r.pending}</td><td>${r.percentage===null?'—':r.percentage.toFixed(1)+'%'}</td><td>${resultGrade(r.percentage)}</td><td>${pos(r.position)}</td><td>${r.status}</td></tr>`).join('')||'<tr><td colspan="10" class="empty">No students in this class.</td></tr>';
  const complete=rows.filter(r=>r.percentage!==null),avg=complete.length?complete.reduce((a,r)=>a+r.percentage,0)/complete.length:null,topper=ranked[0];
  $('resultSummary').textContent=`${t.name} · ${t.category||'Daily / Chapter Test'} · ${t.cls} · Subjects ${tests.length} · Students ${rows.length} · Complete ${complete.length} · Average ${avg===null?'—':avg.toFixed(1)+'%'} · Topper: ${topper?safe(topper.s.name)+' ('+topper.percentage.toFixed(1)+'%)':'Not available'}`;
 }
