@@ -155,11 +155,27 @@ function showClassResultSummary(){
  '</tbody></table></div>';
 }
 function printClassResultSummary(){
- const {test:t,rows,ranked}=getClassResultData();if(!t){alert('پہلے ٹیسٹ منتخب کریں۔');return}
+ const {test:t}=getClassResultData();if(!t){alert('پہلے ٹیسٹ منتخب کریں۔');return}
  showClassResultSummary();
- const html=$('classResultSummary').innerHTML;
+ const content=$('classResultSummary').innerHTML;
+ const schoolLogo='<svg viewBox="0 0 100 110" aria-label="GHS 148GB school emblem"><path d="M50 4 91 19v34c0 25-17 42-41 53C26 95 9 78 9 53V19z" fill="#123b70" stroke="#d6a63b" stroke-width="4"/><path d="M25 52h50v24H25z" fill="#fff"/><path d="M50 28v24M38 37l12-9 12 9" stroke="#e5b544" stroke-width="5" fill="none"/><path d="M31 58q10-8 19 0 9-8 19 0v11q-10-7-19 0-9-7-19 0z" fill="#dcecff"/><text x="50" y="88" fill="#fff" font-size="9" text-anchor="middle" font-weight="bold">GHS 148GB</text></svg>';
+ const deptLogo='<svg viewBox="0 0 100 110" aria-label="Punjab education emblem"><circle cx="50" cy="45" r="38" fill="#f4fbf6" stroke="#176b45" stroke-width="4"/><path d="M26 52q24-14 48 0M26 62q24-14 48 0M26 72q24-14 48 0" fill="none" stroke="#176b45" stroke-width="4"/><path d="M50 17a12 12 0 1 0 12 12A10 10 0 0 1 50 17z" fill="#176b45"/><text x="50" y="101" text-anchor="middle" font-size="8" fill="#176b45" font-weight="bold">PUNJAB</text></svg>';
  const w=window.open('','_blank');if(!w){alert('Popup blocked ہے۔ Chrome میں Pop-ups allow کریں۔');return}
- w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>GHS 148GB Class Result Summary</title><style>body{font-family:Arial,sans-serif;color:#18342c;padding:20px}h2,h3{color:#123b70}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.tablewrap{overflow:visible}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #9aabb9;padding:7px;text-align:left;font-size:11px}th{background:#e5edf6} @page{size:A4 landscape;margin:10mm}</style></head><body><h2>GOVT. HIGH SCHOOL 148GB — CLASS RESULT SUMMARY</h2><p>Toba Tek Singh · Ilm Roshni</p>'+html+'<script>window.onload=()=>window.print()<\\/script></body></html>');w.document.close();
+ w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>GHS 148GB Class Result Sheet</title><style>'+
+ '*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#17365d;margin:0;padding:8mm;background:#fff}'+
+ '.school-head{display:grid;grid-template-columns:65px 1fr 65px;align-items:center;gap:10px;text-align:center;border-bottom:2px solid #174b80;padding:0 0 7px;margin-bottom:8px}'+
+ '.school-head svg{width:58px;height:64px}.school-head h1{font-size:17px;margin:3px 0;color:#123b70}.school-head .gov{font-size:10px;font-weight:bold;letter-spacing:1px}.school-head .sub{font-size:10px;margin:2px}.school-head .title{display:inline-block;background:#123b70;color:#fff;padding:5px 22px;border-radius:4px;font-size:12px;font-weight:bold;letter-spacing:1px;margin-top:5px}'+
+ '.meta{display:flex;justify-content:space-between;gap:12px;font-size:10px;margin:6px 0}.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin:7px 0}.grid>div{background:#f0f5fb;border:1px solid #d5e2ef;border-radius:5px;padding:5px}.grid strong{font-size:13px;color:#123b70}.grid div div{font-size:8px;color:#526984}'+
+ 'h3{font-size:11px;margin:8px 0 4px;color:#123b70}.muted{font-size:8px;color:#526984;margin:5px 0}.tablewrap{overflow:visible}table{width:100%;border-collapse:collapse;min-width:0;margin-top:5px}thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}th,td{border:1px solid #8da4bd;padding:3px 5px;text-align:left;font-size:8px}th{background:#dce9f7;color:#123b70}'+
+ '.signatures{display:flex;justify-content:space-between;margin:22px 25px 8px;font-size:9px}.signatures div{width:34%;border-top:1px solid #17365d;text-align:center;padding-top:5px}.foot{text-align:center;font-size:8px;color:#526984;margin-top:8px}'+
+ '@page{size:A4 landscape;margin:8mm}@media print{body{padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}}'+
+ '</style></head><body>'+
+ '<div class="school-head"><div>'+schoolLogo+'</div><div><div class="gov">GOVERNMENT OF THE PUNJAB</div><h1>GOVT. HIGH SCHOOL 148GB</h1><div class="sub">Toba Tek Singh · Ilm Roshni</div><div class="title">CLASS RESULT SHEET</div></div><div>'+deptLogo+'<div style="font-size:7px;font-weight:bold;color:#176b45">SCHOOL EDUCATION</div></div></div>'+
+ '<div class="meta"><span><b>Assessment:</b> '+safe(t.name)+' &nbsp; | &nbsp; <b>Subject:</b> '+safe(t.subject||'—')+'</span><span><b>Class:</b> '+safe(t.cls)+(t.section?' / '+safe(t.section):' / All sections')+' &nbsp; | &nbsp; <b>Date:</b> '+safe(t.date||'—')+' &nbsp; | &nbsp; <b>Total Marks:</b> '+safe(t.total)+'</span></div>'+
+ content+
+ '<div class="signatures"><div>Class Teacher Signature</div><div>Headmaster Signature</div></div><div class="foot">GHS 148GB · Toba Tek Singh · Ilm Roshni</div>'+
+ '<script>window.onload=()=>window.print()<\\/script></body></html>');
+ w.document.close();
 }
 function exportClassResultSummaryCSV(){
  const {test:t,rows}=getClassResultData();if(!t){alert('پہلے ٹیسٹ منتخب کریں۔');return}
