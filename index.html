@@ -34,11 +34,12 @@ main{padding:12px 13px 40px}.nav{display:flex;gap:7px;overflow:auto;padding:4px 
 <label>Full Name</label><input id="staffFullName" autocomplete="name" placeholder="اپنا پورا نام">
 <label>Email Address</label><input id="staffEmail" type="email" autocomplete="email" placeholder="name@example.com">
 <label>Password (کم از کم 8 حروف)</label><input id="staffPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Password">
-<div class="authrow"><button id="staffSignup" type="button">Sign Up</button><button id="staffLogin" type="button" class="secondary">Sign In</button><button id="staffLogout" type="button" class="secondary" hidden>Sign Out</button></div>
+<div class="authrow"><button id="staffSignup" type="button">Sign Up</button><button id="staffLogin" type="button" class="secondary">Sign In</button></div>
 <p id="staffAuthMessage" class="authmsg" aria-live="polite">Login کریں یا نیا Teacher اکاؤنٹ بنائیں۔</p>
 
 </section>
 <main id="schoolAppMain">
+<div class="actions no-print" style="justify-content:flex-end;padding:8px 12px"><button id="staffLogout" type="button" class="secondary" hidden>Logout / Sign Out</button></div>
 <div id="staffAdminPanel" hidden><h3>Teacher Approval Requests</h3><div id="staffPendingList"></div></div>
 <nav class="nav no-print" id="nav">
 <button class="active" data-page="home">Overview</button><button data-page="students">Students</button><button data-page="attendance">Attendance</button><button data-page="exams">Tests & Marks</button><button data-page="results">Results</button><button data-page="fees" id="feesNav" hidden>Fees</button><button data-page="timetable">Timetable</button><button data-page="backup">Backup & Settings</button>
