@@ -438,7 +438,7 @@ async function loadSharedSchoolData(){
   });
   const nextTests=exams.map(e=>{
    const cl=classById.get(e.class_id)||{};
-   const match=db.tests.find(x=>x.name===e.exam_name&&x.cls===cl.class_name&&x.subject===e.subject&&x.date===e.exam_date);
+   const match=db.tests.find(x=>x.name===e.exam_name&&x.cls===cl.class_name&&x.subject===e.subject&&x.date===e.exam_date&&(x.category||'Daily / Chapter Test')===(e.exam_type||'Daily / Chapter Test'));
    if(match)oldTestIdMap.set(match.id,e.id);
    return {id:e.id,name:e.exam_name,cls:cl.class_name||'',section:cl.section||'',subject:e.subject||'',category:e.exam_type||'Daily / Chapter Test',total:Number(e.total_marks)||0,date:e.exam_date||'',cloudId:e.id};
   });
