@@ -96,7 +96,26 @@ $('studentForm').onsubmit=async e=>{e.preventDefault();const values={name:$('sNa
 $('studentSearch').oninput=renderStudents;$('studentFilter').onchange=renderStudents;
 function renderStudents(){let q=($('studentSearch').value||'').toLowerCase(),cl=$('studentFilter').value;let list=db.students.filter(s=>(!cl||s.cls===cl)&&[s.name,s.father,s.roll,s.cls,s.section].join(' ').toLowerCase().includes(q));$('studentRows').innerHTML=list.map((s,i)=>`<tr><td>${i+1}</td><td>${safe(s.name)}</td><td>${safe(s.father)}</td><td>${safe(s.cls)} / ${safe(s.section)}</td><td>${safe(s.roll)}</td><td>${safe(s.subject)}</td><td>${safe(s.phone||"")}</td><td>${s.phone?`<a href="tel:${safe(s.phone)}">Call</a> · <a href="https://wa.me/${waNumber(s.phone)}" target="_blank" rel="noopener">WhatsApp</a>`:"—"}</td><td>${['admin','teacher'].includes(schoolAuthProfile?.role)?'<button type="button" class="secondary" onclick="editStudent('+s.id+')">Edit</button> ':''}${schoolAuthProfile?.role==='admin'?'<button type="button" class="danger" onclick="deleteStudent('+s.id+')">Delete</button>':''}</td></tr>`).join('')||'<tr><td colspan="9" class="empty">No students found.</td></tr>'}
 function editStudent(id){if(!['admin','teacher'].includes(schoolAuthProfile?.role)){alert('صرف منظور شدہ Teacher یا Admin ریکارڈ Edit کر سکتا ہے۔');return}const s=db.students.find(x=>String(x.id)===String(id));if(!s)return;editingStudentId=s.id;$('sName').value=s.name||'';$('sFather').value=s.father||'';$('sClass').value=s.cls||'9th';$('sSection').value=s.section||'A';$('sRoll').value=s.roll||'';$('sSubject').value=s.subject||'Biology';$('sAdm').value=s.adm||'';$('sPhone').value=s.phone||'';$('studentForm').closest('.panel').querySelector('h2').textContent='Edit student';$('studentForm').querySelector('button[type="submit"]').textContent='Update student';$('studentForm').scrollIntoView({behavior:'smooth',block:'start'})}
-function deleteStudent(id){if(schoolAuthProfile?.role!=='admin'){alert('صرف Main Admin طالب علم کا ریکارڈ Delete کر سکتا ہے۔');return}if(confirm('Delete this student and related attendance/marks?')){db.students=db.students.filter(s=>s.id!==id);db.attendance=db.attendance.filter(a=>a.sid!==id);db.marks=db.marks.filter(m=>m.sid!==id);persist()}}
+async function deleteStudent(id){
+ if(schoolAuthProfile?.role!=='admin'){alert('صرف Main Admin طالب علم کا ریکارڈ Delete کر سکتا ہے۔');return}
+ const student=db.students.find(s=>String(s.id)===String(id));
+ if(!student)return;
+ if(!confirm('کیا آپ اس طالب علم اور اس کی متعلقہ حاضری، نمبرز اور فیس کا ریکارڈ مستقل Delete کرنا چاہتے ہیں؟'))return;
+ try{
+  if(student.cloudId&&schoolAuthClient){
+   const marks=await schoolAuthClient.from('marks').delete().eq('student_id',student.cloudId);if(marks.error)throw marks.error;
+   const attendance=await schoolAuthClient.from('attendance').delete().eq('student_id',student.cloudId);if(attendance.error)throw attendance.error;
+   const fees=await schoolAuthClient.from('fees').delete().eq('student_id',student.cloudId);if(fees.error)throw fees.error;
+   const removed=await schoolAuthClient.from('students').delete().eq('id',student.cloudId);if(removed.error)throw removed.error;
+  }
+  db.students=db.students.filter(s=>String(s.id)!==String(id));
+  db.attendance=db.attendance.filter(a=>String(a.sid)!==String(id));
+  db.marks=db.marks.filter(m=>String(m.sid)!==String(id));
+  db.fees=db.fees.filter(f=>String(f.sid)!==String(id));
+  persist();renderAll();
+  alert('طالب علم اور متعلقہ Cloud ریکارڈ Delete ہوگیا۔');
+ }catch(err){alert('ریکارڈ Delete نہیں ہوا: '+(err.message||String(err))+'۔ Database کی Admin Delete policy چیک کریں۔')}
+}
 $('testForm').onsubmit=e=>{e.preventDefault();db.tests.push({id:Date.now(),name:$('tName').value.trim(),cls:$('tClass').value,section:$('tSection').value,subject:$('tSubject').value.trim(),total:+$('tTotal').value,date:$('tDate').value});e.target.reset();$('tTotal').value=20;$('tSubject').value='Biology';$('tDate').value=today();persist()};
 function renderTests(){$('testRows').innerHTML=db.tests.map(t=>`<tr><td>${safe(t.name)}</td><td>${t.cls}${t.section?' / '+t.section:' / All'}</td><td>${safe(t.subject)}</td><td>${t.total}</td><td>${safe(t.date)}</td>${schoolAuthProfile?.role==='admin' ? '<td><button class="danger" onclick="deleteTest('+t.id+')">Delete</button></td>' : ''}</tr>`).join('')||'<tr><td colspan="6" class="empty">No tests created yet.</td></tr>'}
 function deleteTest(id){if(schoolAuthProfile?.role!=='admin'){alert('صرف Main Admin ٹیسٹ Delete کر سکتا ہے۔');return}if(confirm('Delete this test and its marks?')){db.tests=db.tests.filter(t=>t.id!==id);db.marks=db.marks.filter(m=>m.tid!==id);persist()}}
