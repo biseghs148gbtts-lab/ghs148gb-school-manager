@@ -395,7 +395,7 @@ async function uploadLocalSchoolData(){
   for(const a of db.attendance){
    const sid=studentIds.get(a.sid);if(!sid)continue;
    let q=await schoolAuthClient.from('attendance').select('id').eq('student_id',sid).eq('attendance_date',a.date).limit(1);
-   if(q.error)throw q.error;const payload={student_id:sid,attendance_date:a.date,status:a.status,marked_by:(await schoolAuthClient.auth.getUser()).data.user.id};
+   if(q.error)throw q.error;const payload={student_id:sid,attendance_date:a.date,status:({P:'present',A:'absent',L:'leave'}[a.status]||a.status),marked_by:(await schoolAuthClient.auth.getUser()).data.user.id};
    if(q.data?.[0]){let z=await schoolAuthClient.from('attendance').update(payload).eq('id',q.data[0].id);if(z.error)throw z.error}
    else{let z=await schoolAuthClient.from('attendance').insert(payload);if(z.error)throw z.error}
   }
