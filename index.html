@@ -66,7 +66,7 @@ main{padding:12px 13px 40px}.nav{display:flex;gap:7px;overflow:auto;padding:4px 
 <div class="panel"><h2>Tests register</h2><div class="tablewrap"><table><thead><tr><th>Test</th><th>Type</th><th>Class/section</th><th>Subject</th><th>Total</th><th>Date</th><th>Action</th></tr></thead><tbody id="testRows"></tbody></table></div></div>
 </section>
 <section class="page" id="results">
-<div class="panel"><h2>Result report</h2><div class="grid"><div class="field"><label>Choose test</label><select id="resultTest"></select></div></div><div class="actions no-print"><button onclick="showResults()">Generate result</button><button class="secondary" onclick="print()">Print / Save as PDF</button><button class="secondary" onclick="exportCSV('results')">Export result CSV</button></div><div id="resultSummary" class="muted"></div><div class="tablewrap"><table><thead><tr><th>Roll</th><th>Student</th><th>Class</th><th>Obtained</th><th>Total</th><th>Percentage</th><th>Grade</th><th>Position</th><th>Status</th></tr></thead><tbody id="resultRows"></tbody></table></div></div>
+<div class="panel"><h2>Result report</h2><div class="grid"><div class="field"><label>Choose test</label><select id="resultTest"></select></div></div><div class="actions no-print"><button onclick="showResults()">Generate result</button><button class="secondary" onclick="print()">Print / Save as PDF</button><button class="secondary" onclick="exportCSV('results')">Export result CSV</button></div><div id="resultSummary" class="muted"></div><div class="tablewrap"><table><thead><tr><th>Roll</th><th>Student</th><th>Class</th><th>Obtained</th><th>Total</th><th>Pending subjects</th><th>Percentage</th><th>Grade</th><th>Position</th><th>Status</th></tr></thead><tbody id="resultRows"></tbody></table></div></div>
 <div class="panel"><h2>Class-wise Result Summary</h2><p class="muted">منتخب ٹیسٹ کی پوری کلاس کا خلاصہ، پوزیشن اور کارکردگی۔</p><div class="actions no-print"><button onclick="showClassResultSummary()">Generate class summary</button><button class="secondary" onclick="printClassResultSummary()">Print / Save summary as PDF</button><button class="secondary" onclick="exportClassResultSummaryCSV()">Export summary CSV</button></div><div id="classResultSummary" class="muted">پہلے ٹیسٹ منتخب کریں، پھر Generate class summary دبائیں۔</div></div>
 <div class="panel"><h2>Individual student result card</h2><p class="muted">منتخب ٹیسٹ کا الگ، پرنٹ کے قابل رزلٹ کارڈ بنائیں۔</p><div class="grid"><div class="field"><label>Choose student</label><select id="cardStudent"><option value="">پہلے ٹیسٹ منتخب کریں</option></select></div></div><div class="actions no-print"><button onclick="previewStudentCard()">Preview result card</button><button class="secondary" onclick="printStudentCard()">Print / Save as PDF</button><button class="secondary" onclick="printAllStudentCards()">Generate all result cards (PDF)</button></div><div id="studentCardPreview"></div></div>
 </section>
@@ -127,20 +127,33 @@ $('markTest').onchange=renderMarkStudents;
 function renderMarkStudents(){let t=db.tests.find(x=>x.id===+$('markTest').value);$('markStudent').innerHTML=db.students.filter(s=>!t||(s.cls===t.cls&&(!t.section||s.section===t.section))).map(s=>`<option value="${s.id}">${safe(s.roll)} · ${safe(s.name)}</option>`).join('')}
 function saveMark(){let t=db.tests.find(x=>x.id===+$('markTest').value),s=db.students.find(x=>x.id===+$('markStudent').value),val=$('obtained').value;if(!t||!s||val===''||+val<0||+val>t.total){$('markMessage').textContent='Select a test/student and enter marks between 0 and total marks.';return}let m=db.marks.find(x=>x.tid===t.id&&x.sid===s.id);if(m)m.obt=+val;else db.marks.push({tid:t.id,sid:s.id,obt:+val});$('obtained').value='';$('markMessage').textContent='Marks saved successfully.';persist()}
 function resultGrade(p){if(p===null)return '—';if(p>=90)return 'A+';if(p>=80)return 'A';if(p>=70)return 'B';if(p>=60)return 'C';if(p>=50)return 'D';if(p>=33)return 'E';return 'F'}
-function showResults(){let t=db.tests.find(x=>x.id===+$('resultTest').value);if(!t){$('resultRows').innerHTML='';$('resultSummary').textContent='Create a test first.';return}let list=db.students.filter(s=>s.cls===t.cls&&(!t.section||s.section===t.section));let rows=list.map(s=>{let m=db.marks.find(m=>m.tid===t.id&&m.sid===s.id),p=m?100*m.obt/t.total:null;return{s,m,p,position:null}});let ranked=rows.filter(r=>r.m).sort((a,b)=>b.p-a.p||Number(a.s.roll||0)-Number(b.s.roll||0));let lastPct=null,lastPosition=0;ranked.forEach((r,i)=>{if(lastPct===null||r.p!==lastPct)lastPosition=i+1;r.position=lastPosition;lastPct=r.p});$('resultRows').innerHTML=rows.map(r=>`<tr><td>${safe(r.s.roll)}</td><td>${safe(r.s.name)}</td><td>${r.s.cls}/${r.s.section}</td><td>${r.m?r.m.obt:'—'}</td><td>${t.total}</td><td>${r.p===null?'—':r.p.toFixed(1)+'%'}</td><td>${resultGrade(r.p)}</td><td>${r.position===null?'—':r.position===1?'1st':r.position===2?'2nd':r.position===3?'3rd':r.position+'th'}</td><td>${r.p===null?'Not entered':r.p>=33?'Pass':'Fail'}</td></tr>`).join('')||'<tr><td colspan="9" class="empty">No students in this class.</td></tr>';let entered=rows.filter(r=>r.m);let avg=entered.length?entered.reduce((a,r)=>a+r.p,0)/entered.length:0;let topper=ranked[0];$('resultSummary').textContent=`${t.name} · ${t.cls} · Students ${rows.length} · Marks entered ${entered.length} · Average ${entered.length?avg.toFixed(1)+'%':'—'} · Class topper: ${topper?safe(topper.s.name)+' ('+topper.p.toFixed(1)+'%)':'Not available'}`}
+function showResults(){
+ const {test:t,tests,rows,ranked}=getClassResultData();
+ if(!t){$('resultRows').innerHTML='';$('resultSummary').textContent='Create a test first.';return}
+ const pos=n=>n===null?'—':n===1?'1st':n===2?'2nd':n===3?'3rd':n+'th';
+ $('resultRows').innerHTML=rows.map(r=>`<tr><td>${safe(r.s.roll)}</td><td>${safe(r.s.name)}</td><td>${safe(r.s.cls)}/${safe(r.s.section)}</td><td>${r.obtained===null?'—':r.obtained}</td><td>${r.total}</td><td>${r.percentage===null?'—':r.percentage.toFixed(1)+'%'}</td><td>${resultGrade(r.percentage)}</td><td>${pos(r.position)}</td><td>${r.status}</td></tr>`).join('')||'<tr><td colspan="9" class="empty">No students in this class.</td></tr>';
+ const complete=rows.filter(r=>r.percentage!==null),avg=complete.length?complete.reduce((a,r)=>a+r.percentage,0)/complete.length:null,topper=ranked[0];
+ $('resultSummary').textContent=`${t.name} · ${t.category||'Daily / Chapter Test'} · ${t.cls} · Subjects ${tests.length} · Students ${rows.length} · Complete ${complete.length} · Average ${avg===null?'—':avg.toFixed(1)+'%'} · Topper: ${topper?safe(topper.s.name)+' ('+topper.percentage.toFixed(1)+'%)':'Not available'}`;
+}
 
 function getClassResultData(){
  const t=db.tests.find(x=>x.id===+$('resultTest').value);
- if(!t)return {test:null,rows:[]};
+ if(!t)return {test:null,tests:[],rows:[],ranked:[]};
+ const tests=getExamGroup(t),total=tests.reduce((n,x)=>n+(Number(x.total)||0),0);
  const students=db.students.filter(s=>s.cls===t.cls&&(!t.section||s.section===t.section));
- const rows=students.map(s=>{const m=db.marks.find(x=>x.tid===t.id&&x.sid===s.id);const obtained=m?Number(m.obt):null;const percentage=obtained===null?null:(Number(t.total)>0?100*obtained/Number(t.total):0);return {s,obtained,percentage,position:null,status:percentage===null?'Not entered':percentage>=33?'Pass':'Fail'}});
+ const rows=students.map(s=>{
+  const subjectMarks=tests.map(x=>{const m=db.marks.find(y=>String(y.tid)===String(x.id)&&String(y.sid)===String(s.id));return {test:x,obtained:m?Number(m.obt):null}});
+  const complete=subjectMarks.every(x=>x.obtained!==null),obtained=subjectMarks.reduce((n,x)=>n+(x.obtained===null?0:x.obtained),0),pending=subjectMarks.filter(x=>x.obtained===null).length;
+  const percentage=complete&&total>0?100*obtained/total:null;
+  return {s,subjectMarks,obtained,total,pending,percentage,position:null,status:percentage===null?'Pending':percentage>=33?'Pass':'Fail'};
+ });
  const ranked=rows.filter(r=>r.percentage!==null).sort((a,b)=>b.percentage-a.percentage||Number(a.s.roll||0)-Number(b.s.roll||0));
  let lastPct=null,lastPosition=0;
  ranked.forEach((r,i)=>{if(lastPct===null||r.percentage!==lastPct)lastPosition=i+1;r.position=lastPosition;lastPct=r.percentage});
- return {test:t,rows,ranked};
+ return {test:t,tests,total,rows,ranked};
 }
 function showClassResultSummary(){
- const {test:t,rows,ranked}=getClassResultData(),el=$('classResultSummary');
+ const {test:t,tests,total,rows,ranked}=getClassResultData(),el=$('classResultSummary');
  if(!t){el.innerHTML='<p class="empty">پہلے ٹیسٹ منتخب کریں۔</p>';return}
  const entered=rows.filter(r=>r.percentage!==null),passed=entered.filter(r=>r.status==='Pass').length,failed=entered.length-passed,pending=rows.length-entered.length;
  const avg=entered.length?entered.reduce((sum,r)=>sum+r.percentage,0)/entered.length:null;
@@ -148,15 +161,15 @@ function showClassResultSummary(){
  const passRate=entered.length?100*passed/entered.length:null;
  const stat=(label,value)=>'<div style="background:#f0f5fb;border:1px solid #d5e2ef;border-radius:10px;padding:12px"><div style="font-size:12px;color:#526984">'+label+'</div><strong style="display:block;font-size:22px;color:#123b70;margin-top:4px">'+value+'</strong></div>';
  const posLabel=n=>n===null?'—':n===1?'1st':n===2?'2nd':n===3?'3rd':n+'th';
- el.innerHTML='<div style="margin:10px 0 14px"><b>'+safe(t.name)+'</b> · '+safe(t.cls)+(t.section?' / '+safe(t.section):' / All sections')+' · Total marks: '+safe(t.total)+' · Date: '+safe(t.date||'—')+'</div>'+
- '<div class="grid">'+stat('Total students',rows.length)+stat('Marks entered',entered.length)+stat('Pass',passed)+stat('Fail',failed)+stat('Not entered',pending)+stat('Class average',avg===null?'—':avg.toFixed(1)+'%')+stat('Pass percentage',passRate===null?'—':passRate.toFixed(1)+'%')+stat('Highest marks',topper?topper.obtained+'/'+t.total:'—')+stat('Lowest marks',lowest?lowest.obtained+'/'+t.total:'—')+'</div>'+
+ el.innerHTML='<div style="margin:10px 0 14px"><b>'+safe(t.name)+'</b> · '+safe(t.cls)+(t.section?' / '+safe(t.section):' / All sections')+' · Type: '+safe(t.category||'Daily / Chapter Test')+' · Subjects: '+tests.length+' · Grand total: '+total+' · Date: '+safe(t.date||'—')+'</div>'+
+ '<div class="grid">'+stat('Total students',rows.length)+stat('Complete results',entered.length)+stat('Pass',passed)+stat('Fail',failed)+stat('Not entered',pending)+stat('Class average',avg===null?'—':avg.toFixed(1)+'%')+stat('Pass percentage',passRate===null?'—':passRate.toFixed(1)+'%')+stat('Highest marks',topper?topper.obtained+'/'+total:'—')+stat('Lowest marks',lowest?lowest.obtained+'/'+total:'—')+'</div>'+
  '<p class="muted">Pass percentage صرف ان طلبہ میں سے نکالا گیا ہے جن کے نمبر درج ہیں۔ Not entered طلبہ کو Pass/Fail شرح میں شامل نہیں کیا گیا۔</p>'+
- '<h3>Student position list</h3><div class="tablewrap"><table><thead><tr><th>Position</th><th>Roll</th><th>Student</th><th>Obtained</th><th>Total</th><th>Percentage</th><th>Grade</th><th>Status</th></tr></thead><tbody>'+
- [...rows].sort((a,b)=>{if(a.position===null)return b.position===null?Number(a.s.roll||0)-Number(b.s.roll||0):1;if(b.position===null)return -1;return a.position-b.position||Number(a.s.roll||0)-Number(b.s.roll||0)}).map(r=>'<tr><td>'+posLabel(r.position)+'</td><td>'+safe(r.s.roll||'—')+'</td><td>'+safe(r.s.name)+'</td><td>'+(r.obtained===null?'—':r.obtained)+'</td><td>'+safe(t.total)+'</td><td>'+(r.percentage===null?'—':r.percentage.toFixed(1)+'%')+'</td><td>'+resultGrade(r.percentage)+'</td><td>'+r.status+'</td></tr>').join('')+
+ '<h3>Student position list</h3><div class="tablewrap"><table><thead><tr><th>Position</th><th>Roll</th><th>Student</th><th>Obtained</th><th>Total</th><th>Pending subjects</th><th>Percentage</th><th>Grade</th><th>Status</th></tr></thead><tbody>'+
+ [...rows].sort((a,b)=>{if(a.position===null)return b.position===null?Number(a.s.roll||0)-Number(b.s.roll||0):1;if(b.position===null)return -1;return a.position-b.position||Number(a.s.roll||0)-Number(b.s.roll||0)}).map(r=>'<tr><td>'+posLabel(r.position)+'</td><td>'+safe(r.s.roll||'—')+'</td><td>'+safe(r.s.name)+'</td><td>'+(r.obtained===0&&r.pending===tests.length?'—':r.obtained)+'</td><td>'+r.total+'</td><td>'+r.pending+'</td><td>'+(r.percentage===null?'—':r.percentage.toFixed(1)+'%')+'</td><td>'+resultGrade(r.percentage)+'</td><td>'+r.status+'</td></tr>').join('')+
  '</tbody></table></div>';
 }
 function printClassResultSummary(){
- const {test:t}=getClassResultData();if(!t){alert('پہلے ٹیسٹ منتخب کریں۔');return}
+ const {test:t,tests,total}=getClassResultData();if(!t){alert('پہلے ٹیسٹ منتخب کریں۔');return}
  showClassResultSummary();
  const content=$('classResultSummary').innerHTML;
  const schoolLogo='<svg viewBox="0 0 100 110" aria-label="GHS 148GB school emblem"><path d="M50 4 91 19v34c0 25-17 42-41 53C26 95 9 78 9 53V19z" fill="#123b70" stroke="#d6a63b" stroke-width="4"/><path d="M25 52h50v24H25z" fill="#fff"/><path d="M50 28v24M38 37l12-9 12 9" stroke="#e5b544" stroke-width="5" fill="none"/><path d="M31 58q10-8 19 0 9-8 19 0v11q-10-7-19 0-9-7-19 0z" fill="#dcecff"/><text x="50" y="88" fill="#fff" font-size="9" text-anchor="middle" font-weight="bold">GHS 148GB</text></svg>';
@@ -172,18 +185,18 @@ function printClassResultSummary(){
  '@page{size:A4 landscape;margin:8mm}@media print{body{padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}}'+
  '</style></head><body>'+
  '<div class="school-head"><div>'+schoolLogo+'</div><div><div class="gov">GOVERNMENT OF THE PUNJAB</div><h1>GOVT. HIGH SCHOOL 148GB</h1><div class="sub">Toba Tek Singh · Ilm Roshni</div><div class="title">CLASS RESULT SHEET</div></div><div>'+deptLogo+'<div style="font-size:7px;font-weight:bold;color:#176b45">SCHOOL EDUCATION</div></div></div>'+
- '<div class="meta"><span><b>Assessment:</b> '+safe(t.name)+' &nbsp; | &nbsp; <b>Subject:</b> '+safe(t.subject||'—')+'</span><span><b>Class:</b> '+safe(t.cls)+(t.section?' / '+safe(t.section):' / All sections')+' &nbsp; | &nbsp; <b>Date:</b> '+safe(t.date||'—')+' &nbsp; | &nbsp; <b>Total Marks:</b> '+safe(t.total)+'</span></div>'+
+ '<div class="meta"><span><b>Assessment:</b> '+safe(t.name)+' &nbsp; | &nbsp; <b>Type:</b> '+safe(t.category||'Daily / Chapter Test')+' &nbsp; | &nbsp; <b>Subjects:</b> '+safe(tests.map(x=>x.subject).join(', '))+'</span><span><b>Class:</b> '+safe(t.cls)+(t.section?' / '+safe(t.section):' / All sections')+' &nbsp; | &nbsp; <b>Date:</b> '+safe(t.date||'—')+' &nbsp; | &nbsp; <b>Grand Total:</b> '+total+'</span></div>'+
  content+
  '<div class="signatures"><div>Class Teacher Signature</div><div>Headmaster Signature</div></div><div class="foot">GHS 148GB · Toba Tek Singh · Ilm Roshni</div>'+
  '<script>window.onload=()=>window.print()<\\/script></body></html>');
  w.document.close();
 }
 function exportClassResultSummaryCSV(){
- const {test:t,rows}=getClassResultData();if(!t){alert('پہلے ٹیسٹ منتخب کریں۔');return}
- const csvRows=[['Position','Roll','Student','Father Name','Class','Section','Obtained Marks','Total Marks','Percentage','Grade','Status']];
+ const {test:t,tests,total,rows}=getClassResultData();if(!t){alert('پہلے ٹیسٹ منتخب کریں۔');return}
+ const csvRows=[['Position','Roll','Student','Father Name','Class','Section','Subjects','Obtained Marks','Total Marks','Pending Subjects','Percentage','Grade','Status']];
  const ordered=[...rows].sort((a,b)=>{if(a.position===null)return b.position===null?Number(a.s.roll||0)-Number(b.s.roll||0):1;if(b.position===null)return -1;return a.position-b.position||Number(a.s.roll||0)-Number(b.s.roll||0)});
  const pos=n=>n===null?'':n===1?'1st':n===2?'2nd':n===3?'3rd':n+'th';
- ordered.forEach(r=>csvRows.push([pos(r.position),r.s.roll||'',r.s.name||'',r.s.father||'',r.s.cls||'',r.s.section||'',r.obtained===null?'':r.obtained,t.total,r.percentage===null?'':r.percentage.toFixed(1)+'%',resultGrade(r.percentage),r.status]));
+ ordered.forEach(r=>csvRows.push([pos(r.position),r.s.roll||'',r.s.name||'',r.s.father||'',r.s.cls||'',r.s.section||'',tests.map(x=>x.subject).join('; '),r.obtained===0&&r.pending===tests.length?'':r.obtained,total,r.pending,r.percentage===null?'':r.percentage.toFixed(1)+'%',resultGrade(r.percentage),r.status]));
  const csv=csvRows.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='GHS148GB-'+t.cls+'-'+(t.section||'All')+'-Result-Summary.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500);
 }
