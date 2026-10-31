@@ -127,7 +127,7 @@ async function saveAttendance(){
   if(!userId)throw new Error('Login session نہیں ملی؛ دوبارہ Sign In کریں۔');
   for(const item of cloudRows){
    const studentId=item.student.cloudId;
-   const payload={student_id:studentId,attendance_date:date,status:item.el.value,marked_by:userId};
+   const payload={student_id:studentId,attendance_date:date,status:({P:'present',A:'absent',L:'leave'}[item.el.value]||item.el.value),marked_by:userId};
    const existing=await schoolAuthClient.from('attendance').select('id').eq('student_id',studentId).eq('attendance_date',date).limit(1);
    if(existing.error)throw existing.error;
    if(existing.data?.length){
@@ -292,7 +292,7 @@ async function loadSharedSchoolData(){
   const localTests=db.tests.filter(x=>!oldTestIdMap.has(x.id)&&!exams.some(e=>e.id===x.id));
   const mergedStudents=[...nextStudents,...localStudents];
   const mergedTests=[...nextTests,...localTests];
-  const nextAttendance=att.map(a=>({sid:a.student_id,date:a.attendance_date,status:a.status,cloudId:a.id}));
+  const nextAttendance=att.map(a=>({sid:a.student_id,date:a.attendance_date,status:({present:'P',absent:'A',leave:'L'}[String(a.status).toLowerCase()]||a.status),cloudId:a.id}));
   const nextMarks=marks.map(m=>({sid:m.student_id,tid:m.exam_id,obt:Number(m.obtained_marks),cloudId:m.id}));
   db.students=mergedStudents;
   db.tests=mergedTests;
