@@ -164,12 +164,12 @@ function showClassResultSummary(){
  el.innerHTML='<div style="margin:10px 0 14px"><b>'+safe(t.name)+'</b> · '+safe(t.cls)+(t.section?' / '+safe(t.section):' / All sections')+' · Type: '+safe(t.category||'Daily / Chapter Test')+' · Subjects: '+tests.length+' · Grand total: '+total+' · Date: '+safe(t.date||'—')+'</div>'+
  '<div class="grid">'+stat('Total students',rows.length)+stat('Complete results',entered.length)+stat('Pass',passed)+stat('Fail',failed)+stat('Not entered',pending)+stat('Class average',avg===null?'—':avg.toFixed(1)+'%')+stat('Pass percentage',passRate===null?'—':passRate.toFixed(1)+'%')+stat('Highest marks',topper?topper.obtained+'/'+total:'—')+stat('Lowest marks',lowest?lowest.obtained+'/'+total:'—')+'</div>'+
  '<p class="muted">Pass percentage صرف ان طلبہ میں سے نکالا گیا ہے جن کے نمبر درج ہیں۔ Not entered طلبہ کو Pass/Fail شرح میں شامل نہیں کیا گیا۔</p>'+
- '<h3>Student position list</h3><div class="tablewrap"><table><thead><tr><th>Position</th><th>Roll</th><th>Student</th><th>Obtained</th><th>Total</th><th>Percentage</th><th>Grade</th><th>Status</th></tr></thead><tbody>'+
+ '<h3>Student position list</h3><div class="tablewrap"><table><thead><tr><th>Position</th><th>Roll</th><th>Student</th><th>Obtained</th><th>Total</th><th>Pending subjects</th><th>Percentage</th><th>Grade</th><th>Status</th></tr></thead><tbody>'+
  [...rows].sort((a,b)=>{if(a.position===null)return b.position===null?Number(a.s.roll||0)-Number(b.s.roll||0):1;if(b.position===null)return -1;return a.position-b.position||Number(a.s.roll||0)-Number(b.s.roll||0)}).map(r=>'<tr><td>'+posLabel(r.position)+'</td><td>'+safe(r.s.roll||'—')+'</td><td>'+safe(r.s.name)+'</td><td>'+(r.obtained===0&&r.pending===tests.length?'—':r.obtained)+'</td><td>'+r.total+'</td><td>'+r.pending+'</td><td>'+(r.percentage===null?'—':r.percentage.toFixed(1)+'%')+'</td><td>'+resultGrade(r.percentage)+'</td><td>'+r.status+'</td></tr>').join('')+
  '</tbody></table></div>';
 }
 function printClassResultSummary(){
- const {test:t}=getClassResultData();if(!t){alert('پہلے ٹیسٹ منتخب کریں۔');return}
+ const {test:t,tests,total}=getClassResultData();if(!t){alert('پہلے ٹیسٹ منتخب کریں۔');return}
  showClassResultSummary();
  const content=$('classResultSummary').innerHTML;
  const schoolLogo='<svg viewBox="0 0 100 110" aria-label="GHS 148GB school emblem"><path d="M50 4 91 19v34c0 25-17 42-41 53C26 95 9 78 9 53V19z" fill="#123b70" stroke="#d6a63b" stroke-width="4"/><path d="M25 52h50v24H25z" fill="#fff"/><path d="M50 28v24M38 37l12-9 12 9" stroke="#e5b544" stroke-width="5" fill="none"/><path d="M31 58q10-8 19 0 9-8 19 0v11q-10-7-19 0-9-7-19 0z" fill="#dcecff"/><text x="50" y="88" fill="#fff" font-size="9" text-anchor="middle" font-weight="bold">GHS 148GB</text></svg>';
