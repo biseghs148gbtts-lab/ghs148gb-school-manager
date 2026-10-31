@@ -385,9 +385,9 @@ async function uploadLocalSchoolData(){
   }
   for(const t of db.tests){
    const cid=classIds.get(String(t.cls||'')+'|'+String(t.section||''));if(!cid)continue;
-   let q=await schoolAuthClient.from('exams').select('id').eq('class_id',cid).eq('exam_name',t.name||'').eq('subject',t.subject||'').eq('exam_date',t.date||'').limit(1);
+   let q=await schoolAuthClient.from('exams').select('id').eq('class_id',cid).eq('exam_name',t.name||'').eq('subject',t.subject||'').eq('exam_date',t.date||'').eq('exam_type',t.category||'Daily / Chapter Test').limit(1);
    if(q.error)throw q.error;let row=q.data?.[0];
-   const payload={exam_name:t.name||'',class_id:cid,subject:t.subject||'',exam_date:t.date||null,total_marks:Number(t.total)||0};
+   const payload={exam_name:t.name||'',class_id:cid,subject:t.subject||'',exam_date:t.date||null,total_marks:Number(t.total)||0,exam_type:t.category||'Daily / Chapter Test'};
    if(row){let z=await schoolAuthClient.from('exams').update(payload).eq('id',row.id).select('id').single();if(z.error)throw z.error;row=z.data}
    else{let z=await schoolAuthClient.from('exams').insert(payload).select('id').single();if(z.error)throw z.error;row=z.data}
    examIds.set(t.id,row.id);
@@ -422,7 +422,7 @@ async function loadSharedSchoolData(){
    schoolAuthClient.from('classes').select('id,class_name,section,academic_session'),
    schoolAuthClient.from('students').select('id,student_name,father_name,class_id,roll_no,admission_no,subject_group,mobile,is_active,photo_url'),
    schoolAuthClient.from('attendance').select('id,student_id,attendance_date,status'),
-   schoolAuthClient.from('exams').select('id,exam_name,class_id,subject,exam_date,total_marks'),
+   schoolAuthClient.from('exams').select('id,exam_name,class_id,subject,exam_date,total_marks,exam_type'),
    schoolAuthClient.from('marks').select('id,exam_id,student_id,obtained_marks'),
    ...(schoolAuthProfile.role==='admin'?[schoolAuthClient.from('fees').select('id,student_id,amount,paid_amount,due_date,payment_date')]:[Promise.resolve({data:[],error:null})])
   ]);
@@ -438,9 +438,9 @@ async function loadSharedSchoolData(){
   });
   const nextTests=exams.map(e=>{
    const cl=classById.get(e.class_id)||{};
-   const match=db.tests.find(x=>x.name===e.exam_name&&x.cls===cl.class_name&&x.subject===e.subject&&x.date===e.exam_date);
+   const match=db.tests.find(x=>x.name===e.exam_name&&x.cls===cl.class_name&&x.subject===e.subject&&x.date===e.exam_date&&(x.category||'Daily / Chapter Test')===(e.exam_type||'Daily / Chapter Test'));
    if(match)oldTestIdMap.set(match.id,e.id);
-   return {id:e.id,name:e.exam_name,cls:cl.class_name||'',section:cl.section||'',subject:e.subject||'',total:Number(e.total_marks)||0,date:e.exam_date||'',cloudId:e.id};
+   return {id:e.id,name:e.exam_name,cls:cl.class_name||'',section:cl.section||'',subject:e.subject||'',category:e.exam_type||'Daily / Chapter Test',total:Number(e.total_marks)||0,date:e.exam_date||'',cloudId:e.id};
   });
   const localStudents=db.students.filter(x=>!oldStudentIdMap.has(x.id)&&!students.some(s=>s.id===x.id));
   const localTests=db.tests.filter(x=>!oldTestIdMap.has(x.id)&&!exams.some(e=>e.id===x.id));
