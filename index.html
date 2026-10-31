@@ -80,6 +80,7 @@ main{padding:12px 13px 40px}.nav{display:flex;gap:7px;overflow:auto;padding:4px 
 </main><footer>GHS 148GB School Manager · Prototype · Keep student information private</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+let schoolAuthClient=null,schoolAuthProfile=null;
 const KEY='ghs148gb_professional_v1';
 let db;try{db=JSON.parse(localStorage.getItem(KEY))}catch(e){};if(!db)db={students:[],attendance:[],tests:[],marks:[],fees:[],timetable:{}};if(!Array.isArray(db.fees))db.fees=[];
 const $=id=>document.getElementById(id);const today=()=>new Date().toLocaleDateString('en-CA');
@@ -170,7 +171,6 @@ buildPeriods();renderAll();
 // Browser code uses the publishable key only; never add a service-role key here.
 const SCHOOL_SUPABASE_URL='https://fswjqdlmlyvigcnaelvc.supabase.co';
 const SCHOOL_SUPABASE_PUBLISHABLE_KEY='sb_publishable_zrQX_6MjKYVKQKT3xUunWQ_gtuH-ybp';
-let schoolAuthClient=null,schoolAuthProfile=null;
 function staffAuthMsg(message,success=false){const el=$('staffAuthMessage');el.textContent=message;el.style.background=success?'#eaf7ef':'#fff7df';el.style.color=success?'#175b3e':'#6c551a'}
 function setSchoolAppVisible(visible){$('schoolAppMain').classList.toggle('hidden',!visible);$('staffAuthGate').classList.toggle('hidden',visible)}
 async function refreshStaffSession(){
